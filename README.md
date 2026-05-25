@@ -25,6 +25,11 @@ dist\CodexProxyLauncher.exe
 
 ## Features
 
+- Fluent-style two-page UI with a left sidebar.
+- Home page contains only the Codex logo and a Start button.
+- Settings page contains proxy, shortcut, config patch, and log controls.
+- Chinese UI on Chinese Windows; English UI otherwise.
+- Light/dark appearance follows Windows app theme automatically.
 - Configure the proxy URL.
 - Start Microsoft Store Codex with `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, lowercase variants, and Electron `--proxy-server`.
 - Optionally close existing Microsoft Store Codex processes before launch.
