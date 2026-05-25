@@ -29,7 +29,7 @@ dist\CodexProxyLauncher.exe
 - Start Microsoft Store Codex with `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, lowercase variants, and Electron `--proxy-server`.
 - Optionally close existing Microsoft Store Codex processes before launch.
 - Optionally patch `%USERPROFILE%\.codex\config.toml` so Codex child MCP processes inherit proxy env.
-- Create a desktop shortcut.
+- Create a desktop shortcut that directly launches Codex through the proxy.
 - Remove the config patch.
 
 Config is saved at:
@@ -56,6 +56,28 @@ The output is:
 
 ```text
 dist\CodexProxyLauncher.exe
+```
+
+## Direct Launch Shortcut
+
+The GUI's shortcut button creates:
+
+```text
+%USERPROFILE%\Desktop\Codex Proxy.lnk
+```
+
+That shortcut runs:
+
+```text
+CodexProxyLauncher.exe --launch
+```
+
+It does not open the configuration window. It reads the saved config and starts Codex directly with proxy injection.
+
+You can also create the same shortcut from the command line:
+
+```cmd
+dist\CodexProxyLauncher.exe --create-shortcut
 ```
 
 ## Files

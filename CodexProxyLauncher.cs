@@ -12,8 +12,36 @@ namespace CodexProxyLauncher
     internal static class Program
     {
         [STAThread]
-        private static void Main()
+        private static void Main(string[] args)
         {
+            if (args.Any(x => x.Equals("--launch", StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    LauncherRuntime.Launch(LauncherConfig.Load(), null);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Codex Proxy Launcher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+
+                return;
+            }
+
+            if (args.Any(x => x.Equals("--create-shortcut", StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    LauncherShortcut.CreateDirectLaunchShortcut(Application.ExecutablePath);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Codex Proxy Launcher", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+
+                return;
+            }
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new MainForm());
@@ -139,7 +167,7 @@ namespace CodexProxyLauncher
 
         private void SaveConfig()
         {
-            var proxy = NormalizeProxyUrl(proxyTextBox.Text);
+            var proxy = ProxyTools.NormalizeProxyUrl(proxyTextBox.Text);
             config.ProxyUrl = proxy;
             config.RestartCodex = restartCheckBox.Checked;
             config.PatchCodexConfig = patchConfigCheckBox.Checked;
@@ -150,43 +178,14 @@ namespace CodexProxyLauncher
         private void LaunchCodex()
         {
             SaveConfig();
-
-            var codex = CodexApp.Find();
-            Log("Codex: " + codex.ExePath);
-
-            if (config.PatchCodexConfig)
-            {
-                CodexConfigPatch.Apply(config.ProxyUrl);
-                Log("Patched Codex child process config.");
-            }
-
-            if (config.RestartCodex)
-            {
-                var stopped = ProcessTools.StopCodexStoreProcesses(codex.InstallLocation);
-                Log("Stopped Codex Store processes: " + stopped);
-            }
-
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = codex.ExePath,
-                WorkingDirectory = codex.AppDir,
-                UseShellExecute = false
-            };
-            AddProxyEnvironment(startInfo, config.ProxyUrl);
-            startInfo.Arguments = "--proxy-server=" + QuoteArg(config.ProxyUrl) +
-                                  " --proxy-bypass-list=" + QuoteArg("<-loopback>;localhost;127.0.0.1;::1");
-
-            Process.Start(startInfo);
-            Log("Started Codex with proxy: " + config.ProxyUrl);
+            LauncherRuntime.Launch(config, Log);
         }
 
         private void CreateDesktopShortcut()
         {
             SaveConfig();
             var exePath = Application.ExecutablePath;
-            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            var shortcutPath = Path.Combine(desktop, "Codex Proxy Launcher.lnk");
-            ShortcutTools.CreateShortcut(shortcutPath, exePath, "", Path.GetDirectoryName(exePath), exePath);
+            var shortcutPath = LauncherShortcut.CreateDirectLaunchShortcut(exePath);
             Log("Created shortcut: " + shortcutPath);
         }
 
@@ -201,7 +200,52 @@ namespace CodexProxyLauncher
             logTextBox.AppendText("[" + DateTime.Now.ToString("HH:mm:ss") + "] " + message + Environment.NewLine);
         }
 
-        private static string NormalizeProxyUrl(string value)
+    }
+
+    internal static class LauncherRuntime
+    {
+        public static void Launch(LauncherConfig config, Action<string> log)
+        {
+            config.ProxyUrl = ProxyTools.NormalizeProxyUrl(config.ProxyUrl);
+
+            var codex = CodexApp.Find();
+            Log(log, "Codex: " + codex.ExePath);
+
+            if (config.PatchCodexConfig)
+            {
+                CodexConfigPatch.Apply(config.ProxyUrl);
+                Log(log, "Patched Codex child process config.");
+            }
+
+            if (config.RestartCodex)
+            {
+                var stopped = ProcessTools.StopCodexStoreProcesses(codex.InstallLocation);
+                Log(log, "Stopped Codex Store processes: " + stopped);
+            }
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = codex.ExePath,
+                WorkingDirectory = codex.AppDir,
+                UseShellExecute = false
+            };
+            ProxyTools.AddProxyEnvironment(startInfo, config.ProxyUrl);
+            startInfo.Arguments = "--proxy-server=" + ProxyTools.QuoteArg(config.ProxyUrl) +
+                                  " --proxy-bypass-list=" + ProxyTools.QuoteArg("<-loopback>;localhost;127.0.0.1;::1");
+
+            Process.Start(startInfo);
+            Log(log, "Started Codex with proxy: " + config.ProxyUrl);
+        }
+
+        private static void Log(Action<string> log, string message)
+        {
+            if (log != null) log(message);
+        }
+    }
+
+    internal static class ProxyTools
+    {
+        public static string NormalizeProxyUrl(string value)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -223,7 +267,7 @@ namespace CodexProxyLauncher
             return uri.AbsoluteUri.TrimEnd('/');
         }
 
-        private static void AddProxyEnvironment(ProcessStartInfo startInfo, string proxyUrl)
+        public static void AddProxyEnvironment(ProcessStartInfo startInfo, string proxyUrl)
         {
             var bypass = "localhost,127.0.0.1,::1";
             SetEnv(startInfo, "HTTP_PROXY", proxyUrl);
@@ -237,6 +281,11 @@ namespace CodexProxyLauncher
             SetEnv(startInfo, "NODE_USE_ENV_PROXY", "1");
         }
 
+        public static string QuoteArg(string value)
+        {
+            return "\"" + value.Replace("\"", "\\\"") + "\"";
+        }
+
         private static void SetEnv(ProcessStartInfo startInfo, string key, string value)
         {
             if (startInfo.EnvironmentVariables.ContainsKey(key))
@@ -247,11 +296,6 @@ namespace CodexProxyLauncher
             {
                 startInfo.EnvironmentVariables.Add(key, value);
             }
-        }
-
-        private static string QuoteArg(string value)
-        {
-            return "\"" + value.Replace("\"", "\\\"") + "\"";
         }
     }
 
@@ -310,20 +354,22 @@ namespace CodexProxyLauncher
 
         public static CodexApp Find()
         {
-            var packageRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "WindowsApps");
-            var candidates = Directory.GetDirectories(packageRoot, "OpenAI.Codex_*")
-                .OrderByDescending(x => x)
-                .ToArray();
-
-            foreach (var candidate in candidates)
+            var running = FindFromRunningProcess();
+            if (running != null)
             {
-                var appDir = Path.Combine(candidate, "app");
+                return running;
+            }
+
+            var installLocation = FindInstallLocationWithPowerShell();
+            if (!string.IsNullOrWhiteSpace(installLocation))
+            {
+                var appDir = Path.Combine(installLocation.Trim(), "app");
                 var exe = Path.Combine(appDir, "Codex.exe");
                 if (File.Exists(exe))
                 {
                     return new CodexApp
                     {
-                        InstallLocation = candidate,
+                        InstallLocation = installLocation.Trim(),
                         AppDir = appDir,
                         ExePath = exe
                     };
@@ -331,6 +377,61 @@ namespace CodexProxyLauncher
             }
 
             throw new InvalidOperationException("Could not find Microsoft Store Codex at C:\\Program Files\\WindowsApps\\OpenAI.Codex_*\\app\\Codex.exe.");
+        }
+
+        private static CodexApp FindFromRunningProcess()
+        {
+            foreach (var process in Process.GetProcessesByName("Codex"))
+            {
+                string path;
+                try
+                {
+                    path = process.MainModule == null ? null : process.MainModule.FileName;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(path)) continue;
+                var marker = "\\OpenAI.Codex_";
+                var markerIndex = path.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                if (markerIndex < 0) continue;
+                var appIndex = path.IndexOf("\\app\\", markerIndex, StringComparison.OrdinalIgnoreCase);
+                if (appIndex < 0) continue;
+                if (!path.EndsWith("\\app\\Codex.exe", StringComparison.OrdinalIgnoreCase)) continue;
+
+                var installLocation = path.Substring(0, appIndex);
+                return new CodexApp
+                {
+                    InstallLocation = installLocation,
+                    AppDir = Path.Combine(installLocation, "app"),
+                    ExePath = path
+                };
+            }
+
+            return null;
+        }
+
+        private static string FindInstallLocationWithPowerShell()
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"(Get-AppxPackage -Name OpenAI.Codex | Sort-Object Version -Descending | Select-Object -First 1).InstallLocation\"",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            using (var process = Process.Start(startInfo))
+            {
+                if (process == null) return null;
+                var output = process.StandardOutput.ReadToEnd().Trim();
+                process.WaitForExit(5000);
+                return process.ExitCode == 0 ? output : null;
+            }
         }
     }
 
@@ -473,6 +574,33 @@ namespace CodexProxyLauncher
             shortcut.WorkingDirectory = workingDirectory ?? "";
             shortcut.IconLocation = iconPath ?? targetPath;
             shortcut.Save();
+        }
+    }
+
+    internal static class LauncherShortcut
+    {
+        public static string CreateDirectLaunchShortcut(string launcherExePath)
+        {
+            var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            var shortcutPath = Path.Combine(desktop, "Codex Proxy.lnk");
+            string iconPath;
+            try
+            {
+                iconPath = CodexApp.Find().ExePath;
+            }
+            catch
+            {
+                iconPath = launcherExePath;
+            }
+
+            ShortcutTools.CreateShortcut(
+                shortcutPath,
+                launcherExePath,
+                "--launch",
+                Path.GetDirectoryName(launcherExePath),
+                iconPath);
+
+            return shortcutPath;
         }
     }
 }
