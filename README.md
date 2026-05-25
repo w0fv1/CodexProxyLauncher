@@ -8,9 +8,31 @@ Default proxy:
 http://127.0.0.1:7890
 ```
 
+## Download / Run
+
+Use the GUI executable:
+
+```powershell
+.\dist\CodexProxyLauncher.exe
+```
+
+The app lets you configure:
+
+- proxy URL
+- whether to close existing Microsoft Store Codex processes before launch
+- whether to patch `%USERPROFILE%\.codex\config.toml` for Codex child processes
+
+It also has buttons to launch Codex, create a desktop shortcut, save config, and remove the config patch.
+
+Configuration is saved to:
+
+```text
+%APPDATA%\CodexProxyLauncher\config.ini
+```
+
 ## What It Does
 
-`scripts/Start-CodexProxy.ps1` finds the Microsoft Store Codex install, injects proxy settings into the process environment, and starts `Codex.exe` with Electron/Chromium proxy flags:
+The launcher finds the Microsoft Store Codex install, injects proxy settings into the process environment, and starts `Codex.exe` with Electron/Chromium proxy flags:
 
 - `HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY`
 - lowercase proxy env variants
@@ -21,7 +43,23 @@ http://127.0.0.1:7890
 
 It can also patch `%USERPROFILE%\.codex\config.toml` so Codex child MCP processes inherit the same proxy environment.
 
-## Quick Start
+## Build
+
+No .NET SDK is required for the current build. It uses the C# compiler included with Windows .NET Framework:
+
+```powershell
+.\build.cmd
+```
+
+Output:
+
+```text
+dist\CodexProxyLauncher.exe
+```
+
+Optional modern build path: install the .NET SDK if you want to port this to .NET 8/9 and produce a self-contained single-file app. The current repository does not require that.
+
+## PowerShell Fallback
 
 Run:
 
@@ -31,7 +69,7 @@ Run:
 
 That command closes the existing Microsoft Store Codex app process tree and starts Codex again with proxy injection enabled.
 
-## Desktop Shortcut
+## PowerShell Desktop Shortcut
 
 Run:
 
