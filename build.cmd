@@ -20,8 +20,7 @@ if not exist dist mkdir dist
   /reference:System.Drawing.dll ^
   /reference:System.Windows.Forms.dll ^
   /reference:Microsoft.CSharp.dll ^
-  src\CodexProxyLauncher\Program.cs ^
-  src\CodexProxyLauncher\MainForm.cs
+  CodexProxyLauncher.cs
 
 if errorlevel 1 exit /b %errorlevel%
 

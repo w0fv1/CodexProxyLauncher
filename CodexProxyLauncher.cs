@@ -9,6 +9,17 @@ using System.Windows.Forms;
 
 namespace CodexProxyLauncher
 {
+    internal static class Program
+    {
+        [STAThread]
+        private static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new MainForm());
+        }
+    }
+
     public sealed class MainForm : Form
     {
         private readonly TextBox proxyTextBox;

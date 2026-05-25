@@ -1,6 +1,7 @@
 *.bak
 *.tmp
 *.log
+dist/
 codex-window-*.png
 __pycache__/
 .DS_Store
